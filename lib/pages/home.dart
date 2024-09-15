@@ -200,7 +200,7 @@ class _HomePageState extends State<HomePage> {
         padding: const EdgeInsets.all(8.0),
         child: Container(
           decoration: BoxDecoration(border: Border.all()),
-          width: 280,
+          width: double.maxFinite,
           height: 120,
           alignment: Alignment.center,
           child: ListTile(
