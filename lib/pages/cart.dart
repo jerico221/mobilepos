@@ -2,6 +2,8 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:imin_printer/column_maker.dart';
+import 'package:imin_printer/imin_style.dart';
 import 'package:mobilepos/api/sales.dart';
 import 'package:mobilepos/model/apiresponce.dart';
 
@@ -9,6 +11,9 @@ import 'package:mobilepos/model/items.dart';
 import 'package:mobilepos/model/payment.dart';
 import 'package:mobilepos/repository/helper.dart';
 import 'package:flutter_multi_formatter/flutter_multi_formatter.dart';
+
+import 'package:imin_printer/imin_printer.dart';
+import 'package:imin_printer/enums.dart';
 
 class CartPage extends StatefulWidget {
   List<ItemsModel> items;
@@ -33,6 +38,7 @@ class CartPage extends StatefulWidget {
 }
 
 class _CartPageState extends State<CartPage> {
+  final iminPrinter = IminPrinter();
   final Helper helper = Helper.instance;
   final SalesAPI salesAPI = SalesAPI.instance;
   double total = 0;
@@ -142,6 +148,7 @@ class _CartPageState extends State<CartPage> {
           employeeid, total, change, cashtender, json.encode(items));
 
       if (res.status == 200) {
+        await printerReceipt(double.parse(cashtender), double.parse(change));
         showDialog(
             barrierDismissible: false,
             context: context,
@@ -272,10 +279,16 @@ class _CartPageState extends State<CartPage> {
           context: context,
           builder: (context) {
             return AlertDialog(
-              title: const Text('Select Payment Method'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: paymentList,
+              title: const Text(
+                'Payment Method',
+                style: TextStyle(fontSize: 24),
+                textAlign: TextAlign.center,
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: paymentList,
+                ),
               ),
               actions: [
                 TextButton(
@@ -307,12 +320,164 @@ class _CartPageState extends State<CartPage> {
     total = 0;
     subtotal = 0;
     widget.items.forEach((i) {
-     
-
       setState(() {
         total += double.parse('${i.price * i.quantity}');
       });
     });
+  }
+
+  void printerOrder() async {
+    double total = 0;
+
+    iminPrinter.printColumnsText(cols: [
+      ColumnMaker(
+        text: 'Order List',
+        fontSize: 48,
+        align: IminPrintAlign.center,
+        width: 12,
+      ),
+    ]);
+
+    iminPrinter.printColumnsText(cols: [
+      ColumnMaker(
+        text: '------------------------------------------------------',
+        fontSize: 26,
+        align: IminPrintAlign.center,
+        width: 12,
+      ),
+    ]);
+
+    iminPrinter.printColumnsText(cols: [
+      ColumnMaker(
+        text: 'Items',
+        fontSize: 26,
+        align: IminPrintAlign.left,
+        width: 7,
+      ),
+      ColumnMaker(
+          text: 'Subt ', fontSize: 26, align: IminPrintAlign.right, width: 5)
+    ]);
+    iminPrinter.printColumnsText(cols: [
+      ColumnMaker(
+        text: '------------------------------------------------------',
+        fontSize: 26,
+        align: IminPrintAlign.center,
+        width: 12,
+      ),
+    ]);
+    for (var i in widget.items) {
+      total += i.price * i.quantity;
+      iminPrinter.printColumnsText(cols: [
+        ColumnMaker(
+            text: i.name, fontSize: 26, align: IminPrintAlign.left, width: 7),
+        ColumnMaker(
+            text: '${i.quantity}',
+            fontSize: 26,
+            align: IminPrintAlign.right,
+            width: 5)
+      ]);
+    }
+
+    iminPrinter.printAndFeedPaper(100);
+  }
+
+  Future<void> printerReceipt(double cashtender, double change) async {
+    double total = 0;
+
+    await iminPrinter.printColumnsText(cols: [
+      ColumnMaker(
+        text: 'Nava`s Kitchen',
+        fontSize: 48,
+        align: IminPrintAlign.center,
+        width: 12,
+      ),
+    ]);
+
+    await iminPrinter.printColumnsText(cols: [
+      ColumnMaker(
+        text: '------------------------------------------------------',
+        fontSize: 26,
+        align: IminPrintAlign.center,
+        width: 12,
+      ),
+    ]);
+
+    await iminPrinter.printColumnsText(cols: [
+      ColumnMaker(
+        text: 'Items',
+        fontSize: 26,
+        align: IminPrintAlign.left,
+        width: 7,
+      ),
+      ColumnMaker(
+          text: 'Subt ', fontSize: 26, align: IminPrintAlign.right, width: 5)
+    ]);
+    await iminPrinter.printColumnsText(cols: [
+      ColumnMaker(
+        text: '------------------------------------------------------',
+        fontSize: 26,
+        align: IminPrintAlign.center,
+        width: 12,
+      ),
+    ]);
+    for (var i in widget.items) {
+      total += i.price * i.quantity;
+      await iminPrinter.printColumnsText(cols: [
+        ColumnMaker(
+            text: '${i.name} ${i.price}x${i.quantity}',
+            fontSize: 26,
+            align: IminPrintAlign.left,
+            width: 7),
+        ColumnMaker(
+            text: '${i.price * i.quantity} ',
+            fontSize: 26,
+            align: IminPrintAlign.right,
+            width: 5)
+      ]);
+    }
+    await iminPrinter.printColumnsText(cols: [
+      ColumnMaker(
+        text: '------------------------------------------------------',
+        fontSize: 26,
+        align: IminPrintAlign.center,
+        width: 12,
+      ),
+    ]);
+
+    await iminPrinter.printColumnsText(cols: [
+      ColumnMaker(
+          text: 'Total', fontSize: 26, align: IminPrintAlign.left, width: 7),
+      ColumnMaker(
+          text: '${helper.formatAsCurrency(total)}',
+          fontSize: 26,
+          align: IminPrintAlign.right,
+          width: 5)
+    ]);
+
+    await iminPrinter.printColumnsText(cols: [
+      ColumnMaker(
+          text: 'Cash Tender',
+          fontSize: 26,
+          align: IminPrintAlign.left,
+          width: 7),
+      ColumnMaker(
+          text: '${helper.formatAsCurrency(cashtender)}',
+          fontSize: 26,
+          align: IminPrintAlign.right,
+          width: 5)
+    ]);
+
+    await iminPrinter.printColumnsText(cols: [
+      ColumnMaker(
+          text: 'Change', fontSize: 26, align: IminPrintAlign.left, width: 7),
+      ColumnMaker(
+          text: '${helper.formatAsCurrency(change)}',
+          fontSize: 26,
+          align: IminPrintAlign.right,
+          width: 5)
+    ]);
+
+    iminPrinter.printAndFeedPaper(100);
   }
 
   @override
@@ -411,7 +576,9 @@ class _CartPageState extends State<CartPage> {
             ),
             IconButton(
               icon: const Icon(Icons.print),
-              onPressed: () {},
+              onPressed: () {
+                printerOrder();
+              },
             ),
           ],
         ),
