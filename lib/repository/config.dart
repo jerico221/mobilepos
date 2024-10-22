@@ -4,7 +4,7 @@ class APIS {
 
   static const String posAPI = '/pos/sync';
   static const String loginAPI = '/login/loginpos';
-  static const String productAPI = '/product/load';
+  static const String productAPI = '/product/stockload';
   static const String paymentAPI = '/payment/load';
   static const String salesAPI = '/sales/save';
 }
