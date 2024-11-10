@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:ffi';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:mobilepos/api/payment.dart';
 import 'package:mobilepos/api/product.dart';
 import 'package:mobilepos/model/apiresponce.dart';
@@ -28,6 +30,7 @@ class _HomePageState extends State<HomePage> {
   int totalCartItems = 0;
   Map<String, dynamic> itemList = {};
   List<ItemsModel> cartitems = [];
+  bool isLoading = true;
 
   String employeeid = '';
   int posid = 0;
@@ -60,7 +63,8 @@ class _HomePageState extends State<HomePage> {
               "price": d['price'],
               "category": d['category'],
               "isinventory": d['isinventory'],
-              "status": d['status']
+              "status": d['status'],
+              "stock": d['stock']
             });
             productList.add({
               "id": d['id'],
@@ -69,11 +73,14 @@ class _HomePageState extends State<HomePage> {
               "price": d['price'],
               "category": d['category'],
               "isinventory": d['isinventory'],
-              "status": d['status']
+              "status": d['status'],
+              "stock": d['stock']
             });
           });
 
           helper.jsonListToFileWriteAndroid(productJson, 'product.json');
+
+          isLoading = false;
         });
       }
     } catch (e) {
@@ -155,19 +162,40 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void addCart(int id, String name, double price, int quantity) async {
+  void addCart(
+      int id, String name, double price, int quantity, int stock) async {
     setState(() {
       if (cartitems.isEmpty) {
-        cartitems.add(ItemsModel(id, name, price, quantity));
+        cartitems.add(ItemsModel(id, name, price, quantity, stock));
         totalCartItems += 1;
       } else {
         if (!cartitems.map((e) => e.name == name).contains(true)) {
-          cartitems.add(ItemsModel(id, name, price, quantity));
+          cartitems.add(ItemsModel(id, name, price, quantity, stock));
           totalCartItems += 1;
         } else {
           for (var item in cartitems) {
             if (item.name == name) {
               item.quantity += 1;
+
+              if (stock < item.quantity) {
+                showDialog(
+                    barrierDismissible: false,
+                    context: context,
+                    builder: (context) => AlertDialog(
+                          title: const Text('Error'),
+                          content: const Text('Product is out of stock'),
+                          actions: [
+                            TextButton(
+                                onPressed: () {
+                                  item.quantity -= 1;
+                                  Navigator.pop(context);
+                                },
+                                child: const Text('OK'))
+                          ],
+                        ));
+                return;
+              }
+
               totalCartItems += 1;
 
               print('${item.name} ${item.quantity}');
@@ -181,6 +209,24 @@ class _HomePageState extends State<HomePage> {
 
   void updateCart(int index, int quantity, int cartcount) {
     setState(() {
+      if (cartitems[index].stock < quantity) {
+        showDialog(
+            barrierDismissible: false,
+            context: context,
+            builder: (context) => AlertDialog(
+                  title: const Text('Error'),
+                  content: const Text('Product is out of stock'),
+                  actions: [
+                    TextButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                        },
+                        child: const Text('OK'))
+                  ],
+                ));
+        return;
+      }
+
       cartitems[index].quantity = quantity;
       totalCartItems += cartcount;
     });
@@ -196,6 +242,8 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final List<Widget> items =
         List<Widget>.generate(productList.length, (int index) {
+      if (productList[index]['stock'] <= 0) {
+      } else {}
       return Padding(
         padding: const EdgeInsets.all(8.0),
         child: Container(
@@ -204,6 +252,7 @@ class _HomePageState extends State<HomePage> {
           height: 120,
           alignment: Alignment.center,
           child: ListTile(
+            enabled: productList[index]['stock'] <= 0 ? false : true,
             leading: Image.memory(
                 width: 70, base64Decode(productList[index]['image'])),
             title: Text(productList[index]['name'],
@@ -216,69 +265,85 @@ class _HomePageState extends State<HomePage> {
                     const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
             // trailing: Text(productList[index]['stocks'].toString()),
             onTap: () {
-              addCart(productList[index]['id'], productList[index]['name'],
-                  double.parse(productList[index]['price'].toString()), 1);
+              addCart(
+                  productList[index]['id'],
+                  productList[index]['name'],
+                  double.parse(productList[index]['price'].toString()),
+                  1,
+                  productList[index]['stock']);
             },
           ),
         ),
       );
     });
-    return SafeArea(
-        child: Scaffold(
-      appBar: AppBar(
-        title: const Text('Store Name'),
-        actions: <Widget>[
-          Container(
-            child: Stack(
-              children: [
-                Badge.count(count: totalCartItems),
-                IconButton(
-                  icon: const Icon(Icons.shopping_cart),
-                  onPressed: () {
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => CartPage(
-                                  items: cartitems,
-                                  updateCart: updateCart,
-                                  clearCart: clearCart,
-                                  totalCartItems: totalCartItems,
-                                  posid: posid,
-                                  employeeid: employeeid,
-                                )));
-                  },
-                )
-              ],
-            ),
-          )
-        ],
-      ),
-      drawer: Drawer(
-        child: DrawerHeader(
-            child: ListView(
-          children: [
-            ListTile(
-                title: Text(
-                  'Product',
-                ),
-                leading: Icon(Icons.inventory_2)),
-            ListTile(title: Text('Settings'), leading: Icon(Icons.settings)),
-            Divider(
-              height: 2,
-            ),
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Text('Version: 1.0.0', textAlign: TextAlign.center),
-            ),
+    return WillPopScope(
+      onWillPop: () async {
+        if (totalCartItems > 0) {
+          return false;
+        } else {
+          return true;
+        }
+      },
+      child: SafeArea(
+          child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Store Name'),
+          actions: <Widget>[
+            Container(
+              child: Stack(
+                children: [
+                  Badge.count(count: totalCartItems),
+                  IconButton(
+                    icon: const Icon(Icons.shopping_cart),
+                    onPressed: () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => CartPage(
+                                    items: cartitems,
+                                    updateCart: updateCart,
+                                    clearCart: clearCart,
+                                    totalCartItems: totalCartItems,
+                                    posid: posid,
+                                    employeeid: employeeid,
+                                  )));
+                    },
+                  )
+                ],
+              ),
+            )
           ],
-        )),
-      ),
-      body: SingleChildScrollView(
-        child: Wrap(
-          alignment: WrapAlignment.center,
-          children: items,
         ),
-      ),
-    ));
+        drawer: Drawer(
+          child: DrawerHeader(
+              child: ListView(
+            children: [
+              ListTile(
+                  title: Text(
+                    'Product',
+                  ),
+                  leading: Icon(Icons.inventory_2)),
+              ListTile(title: Text('Settings'), leading: Icon(Icons.settings)),
+              Divider(
+                height: 2,
+              ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text('Version: 1.0.0', textAlign: TextAlign.center),
+              ),
+            ],
+          )),
+        ),
+        body: (isLoading)
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  children:
+                      (items.isNotEmpty) ? items : [const Text('No Products')],
+                ),
+              ),
+      )),
+    );
   }
 }

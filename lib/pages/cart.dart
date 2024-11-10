@@ -144,10 +144,24 @@ class _CartPageState extends State<CartPage> {
       String status,
       String items) async {
     try {
+      showDialog(
+          context: context,
+          builder: (context) {
+            return AlertDialog(
+              title: const Text('Processing'),
+              content: Container(
+                height: 100,
+                child: const Center(
+                  child: CircularProgressIndicator(),
+                ),
+              ),
+            );
+          });
       ResponseModel res = await salesAPI.salesTransaction(paymnetid, posid,
           employeeid, total, change, cashtender, json.encode(items));
 
       if (res.status == 200) {
+        Navigator.pop(context);
         await printerReceipt(double.parse(cashtender), double.parse(change));
         showDialog(
             barrierDismissible: false,
@@ -166,6 +180,7 @@ class _CartPageState extends State<CartPage> {
                 ));
       }
     } catch (e) {
+      Navigator.pop(context);
       showDialog(
           context: context,
           builder: (context) => AlertDialog(
@@ -237,6 +252,67 @@ class _CartPageState extends State<CartPage> {
                                   child: const Text('Back')),
                               TextButton(
                                   onPressed: () {
+                                    print(payments[index].name);
+                                    if (payments[index].name != 'CASH') {
+                                      if (cashtender < total) {
+                                        showDialog(
+                                            context: context,
+                                            builder: (context) => AlertDialog(
+                                                  title: const Text('Error'),
+                                                  content: const Text(
+                                                      'Amount tender cannot be less than total'),
+                                                  actions: [
+                                                    TextButton(
+                                                        onPressed: () {
+                                                          Navigator.pop(
+                                                              context);
+                                                        },
+                                                        child: const Text('OK'))
+                                                  ],
+                                                ));
+                                        return;
+                                      }
+
+                                      if (cashtender > total) {
+                                        showDialog(
+                                            context: context,
+                                            builder: (context) => AlertDialog(
+                                                  title: const Text('Info'),
+                                                  content: const Text(
+                                                      'Please enter the total amount'),
+                                                  actions: [
+                                                    TextButton(
+                                                        onPressed: () {
+                                                          Navigator.pop(
+                                                              context);
+                                                        },
+                                                        child: const Text('OK'))
+                                                  ],
+                                                ));
+                                        return;
+                                      }
+                                    } else {
+                                      if (cashtender < total) {
+                                        showDialog(
+                                            context: context,
+                                            builder: (context) => AlertDialog(
+                                                  title: const Text('Error'),
+                                                  content: const Text(
+                                                      'Amount Tender cannot be less than total'),
+                                                  actions: [
+                                                    TextButton(
+                                                        onPressed: () {
+                                                          Navigator.pop(
+                                                              context);
+                                                        },
+                                                        child: const Text('OK'))
+                                                  ],
+                                                ));
+
+                                        return;
+                                      }
+                                    }
+
                                     setState(() {
                                       List<Map<String, dynamic>> items = [];
                                       change = cashtender - total;
